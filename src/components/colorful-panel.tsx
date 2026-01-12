@@ -24,9 +24,10 @@ export function ColorfulPanel({
   format,
   textColorMode,
 }: ColorfulPanelProps) {
-  const [method, setMethod] = useState<ColorfulMethod>("hue-sweep");
+  const [method, setMethod] = useState<ColorfulMethod>("spectrum");
   const [count, setCount] = useState(12);
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 100000));
+  const [shuffle, setShuffle] = useState(false);
   
   // Fixed parameters
   const [useFixedLightness, setUseFixedLightness] = useState(true);
@@ -43,6 +44,7 @@ export function ColorfulPanel({
         method,
         count,
         seed,
+        shuffle,
         fixedLightness: useFixedLightness ? fixedLightness : undefined,
         fixedChroma: useFixedChroma ? fixedChroma : undefined,
         fixedSaturation: useFixedLightness ? fixedSaturation : undefined,
@@ -50,7 +52,7 @@ export function ColorfulPanel({
       },
       colorSpace
     );
-  }, [method, count, seed, colorSpace, useFixedLightness, fixedLightness, useFixedChroma, fixedChroma, fixedSaturation, fixedLightnessHsl]);
+  }, [method, count, seed, shuffle, colorSpace, useFixedLightness, fixedLightness, useFixedChroma, fixedChroma, fixedSaturation, fixedLightnessHsl]);
 
   const methods = getAllColorfulMethods();
 
@@ -65,7 +67,7 @@ export function ColorfulPanel({
     <div className="space-y-6">
       {/* Method Selection */}
       <div className="space-y-3">
-        <label className="text-sm font-medium text-foreground">Generation Method</label>
+        <label className="text-sm font-medium text-foreground">Style</label>
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
           {methods.map((m) => (
             <button
@@ -127,7 +129,7 @@ export function ColorfulPanel({
                   Lightness (L)
                 </label>
                 <span className="text-sm text-muted-foreground">
-                  {useFixedLightness ? `${(fixedLightness * 100).toFixed(0)}%` : "Random"}
+                  {useFixedLightness ? `${(fixedLightness * 100).toFixed(0)}%` : "Default"}
                 </span>
               </div>
               {useFixedLightness && (
@@ -154,7 +156,7 @@ export function ColorfulPanel({
                   Chroma (C)
                 </label>
                 <span className="text-sm text-muted-foreground">
-                  {useFixedChroma ? fixedChroma.toFixed(2) : "Random"}
+                  {useFixedChroma ? fixedChroma.toFixed(2) : "Default"}
                 </span>
               </div>
               {useFixedChroma && (
@@ -183,7 +185,7 @@ export function ColorfulPanel({
                   Saturation (S)
                 </label>
                 <span className="text-sm text-muted-foreground">
-                  {useFixedLightness ? `${fixedSaturation}%` : "Random"}
+                  {useFixedLightness ? `${fixedSaturation}%` : "Default"}
                 </span>
               </div>
               {useFixedLightness && (
@@ -210,7 +212,7 @@ export function ColorfulPanel({
                   Lightness (L)
                 </label>
                 <span className="text-sm text-muted-foreground">
-                  {useFixedChroma ? `${fixedLightnessHsl}%` : "Random"}
+                  {useFixedChroma ? `${fixedLightnessHsl}%` : "Default"}
                 </span>
               </div>
               {useFixedChroma && (
@@ -227,15 +229,26 @@ export function ColorfulPanel({
         )}
       </div>
 
-      {/* Reshuffle */}
-      {method !== "hue-sweep" && (
-        <button
-          onClick={handleReshuffle}
-          className="w-full h-10 rounded-lg bg-secondary text-secondary-foreground font-medium hover:bg-secondary/80 transition-colors"
-        >
-          Reshuffle
-        </button>
-      )}
+      {/* Shuffle Toggle & Reshuffle */}
+      <div className="flex gap-2 items-center">
+        <label className="flex items-center gap-2 text-sm text-muted-foreground flex-1">
+          <input
+            type="checkbox"
+            checked={shuffle}
+            onChange={(e) => setShuffle(e.target.checked)}
+            className="rounded"
+          />
+          Shuffle order
+        </label>
+        {(shuffle || method === "random") && (
+          <button
+            onClick={handleReshuffle}
+            className="px-4 h-10 rounded-lg bg-secondary text-secondary-foreground font-medium hover:bg-secondary/80 transition-colors"
+          >
+            Reshuffle
+          </button>
+        )}
+      </div>
 
       {/* Generated Colors */}
       <div className="space-y-3">

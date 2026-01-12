@@ -7,20 +7,21 @@ import {
 } from "../color-utils";
 
 export type ColorfulMethod =
-  | "hue-sweep"
-  | "golden-angle"
-  | "random-vibrant"
-  | "random-pastel"
-  | "random-dark"
-  | "random-warm"
-  | "random-cool"
-  | "earth-tones"
-  | "neon";
+  | "spectrum"      // Full spectrum, even distribution
+  | "vibrant"       // High saturation, medium lightness
+  | "pastel"        // Low saturation, high lightness
+  | "dark"          // Low lightness
+  | "neon"          // Very high saturation, high lightness
+  | "warm"          // Red-yellow-orange range
+  | "cool"          // Blue-green-cyan range
+  | "earth"         // Brown/tan range
+  | "random";       // Random hues and values
 
 export interface ColorfulConfig {
   method: ColorfulMethod;
   count: number;
   seed?: number;
+  shuffle?: boolean; // Shuffle the order (default: false for gradient effect)
   // Fixed parameters (OKLCH)
   fixedLightness?: number; // 0-1
   fixedChroma?: number; // 0-0.4
@@ -41,40 +42,97 @@ function seededRandom(seed: number): () => number {
 }
 
 /**
+ * Sort colors by hue for gradient effect
+ */
+function sortByHue(colors: ColorResult[]): ColorResult[] {
+  return [...colors].sort((a, b) => a.oklch.h - b.oklch.h);
+}
+
+/**
+ * Shuffle array using Fisher-Yates algorithm with seeded random
+ */
+function shuffleArray<T>(arr: T[], random: () => number): T[] {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+/**
  * Generate colorful palette without a base color
  */
 export function generateColorful(
   config: ColorfulConfig,
   colorSpace: ColorSpace = "oklch"
 ): ColorResult[] {
-  const { method, count, seed = Date.now() } = config;
+  const { method, count, seed = Date.now(), shuffle = false } = config;
   const random = seededRandom(seed);
 
+  let colors: ColorResult[];
+
   switch (method) {
-    case "hue-sweep":
-      return generateHueSweep(count, config, colorSpace);
-    case "golden-angle":
-      return generateGoldenAngle(count, random, config, colorSpace);
-    case "random-vibrant":
-      return generateRandomVibrant(count, random, config, colorSpace);
-    case "random-pastel":
-      return generateRandomPastel(count, random, config, colorSpace);
-    case "random-dark":
-      return generateRandomDark(count, random, config, colorSpace);
-    case "random-warm":
-      return generateRandomWarm(count, random, config, colorSpace);
-    case "random-cool":
-      return generateRandomCool(count, random, config, colorSpace);
-    case "earth-tones":
-      return generateEarthTones(count, random, config, colorSpace);
+    case "spectrum":
+      colors = generateSpectrum(count, config, colorSpace);
+      break;
+    case "vibrant":
+      colors = generateStyled(count, config, colorSpace, {
+        oklch: { l: 0.65, c: 0.22 },
+        hsl: { s: 85, l: 55 },
+      });
+      break;
+    case "pastel":
+      colors = generateStyled(count, config, colorSpace, {
+        oklch: { l: 0.88, c: 0.08 },
+        hsl: { s: 50, l: 85 },
+      });
+      break;
+    case "dark":
+      colors = generateStyled(count, config, colorSpace, {
+        oklch: { l: 0.35, c: 0.12 },
+        hsl: { s: 60, l: 25 },
+      });
+      break;
     case "neon":
-      return generateNeon(count, random, config, colorSpace);
+      colors = generateStyled(count, config, colorSpace, {
+        oklch: { l: 0.80, c: 0.28 },
+        hsl: { s: 100, l: 60 },
+      });
+      break;
+    case "warm":
+      colors = generateWarmSpectrum(count, config, colorSpace);
+      break;
+    case "cool":
+      colors = generateCoolSpectrum(count, config, colorSpace);
+      break;
+    case "earth":
+      colors = generateEarthSpectrum(count, config, colorSpace);
+      break;
+    case "random":
+      colors = generateRandom(count, random, config, colorSpace);
+      break;
     default:
-      return generateHueSweep(count, config, colorSpace);
+      colors = generateSpectrum(count, config, colorSpace);
   }
+
+  // Shuffle if requested, otherwise colors are already sorted by hue
+  if (shuffle && method !== "random") {
+    colors = shuffleArray(colors, random);
+  }
+
+  return colors;
 }
 
-function generateHueSweep(
+interface StyleDefaults {
+  oklch: { l: number; c: number };
+  hsl: { s: number; l: number };
+}
+
+/**
+ * Generate full spectrum with even hue distribution
+ */
+function generateSpectrum(
   count: number,
   config: ColorfulConfig,
   colorSpace: ColorSpace
@@ -101,28 +159,30 @@ function generateHueSweep(
   return results;
 }
 
-function generateGoldenAngle(
+/**
+ * Generate styled spectrum (vibrant, pastel, dark, neon)
+ */
+function generateStyled(
   count: number,
-  random: () => number,
   config: ColorfulConfig,
-  colorSpace: ColorSpace
+  colorSpace: ColorSpace,
+  defaults: StyleDefaults
 ): ColorResult[] {
-  const goldenAngle = 137.507764;
-  const startHue = random() * 360;
   const results: ColorResult[] = [];
+  const hueStep = 360 / count;
 
   for (let i = 0; i < count; i++) {
-    const h = normalizeHue(startHue + i * goldenAngle);
+    const h = normalizeHue(i * hueStep);
     
     if (colorSpace === "oklch") {
-      const l = config.fixedLightness ?? (0.45 + random() * 0.25);
-      const c = config.fixedChroma ?? (0.12 + random() * 0.12);
+      const l = config.fixedLightness ?? defaults.oklch.l;
+      const c = config.fixedChroma ?? defaults.oklch.c;
       const color = fromOklch(l, c, h);
       if (color) results.push(color);
     } else {
-      const s = config.fixedSaturation ?? (60 + random() * 30);
-      const lHsl = config.fixedLightnessHsl ?? (45 + random() * 25);
-      const color = fromHsl(h, s, lHsl);
+      const s = config.fixedSaturation ?? defaults.hsl.s;
+      const l = config.fixedLightnessHsl ?? defaults.hsl.l;
+      const color = fromHsl(h, s, l);
       if (color) results.push(color);
     }
   }
@@ -130,140 +190,69 @@ function generateGoldenAngle(
   return results;
 }
 
-function generateRandomVibrant(
+/**
+ * Generate warm spectrum (reds, oranges, yellows, magentas)
+ * Hue range: 0-80 and 300-360 (warm colors)
+ */
+function generateWarmSpectrum(
   count: number,
-  random: () => number,
   config: ColorfulConfig,
   colorSpace: ColorSpace
 ): ColorResult[] {
   const results: ColorResult[] = [];
+  // Warm hues: 300-360 (magenta/pink) + 0-80 (red/orange/yellow)
+  // Total range: 140 degrees
+  const totalRange = 140;
+  const hueStep = totalRange / count;
 
   for (let i = 0; i < count; i++) {
-    const h = random() * 360;
-    
-    if (colorSpace === "oklch") {
-      const l = config.fixedLightness ?? (0.55 + random() * 0.2);
-      const c = config.fixedChroma ?? (0.2 + random() * 0.1);
-      const color = fromOklch(l, c, h);
-      if (color) results.push(color);
-    } else {
-      const s = config.fixedSaturation ?? (80 + random() * 20);
-      const lHsl = config.fixedLightnessHsl ?? (50 + random() * 15);
-      const color = fromHsl(h, s, lHsl);
-      if (color) results.push(color);
-    }
-  }
-
-  return results;
-}
-
-function generateRandomPastel(
-  count: number,
-  random: () => number,
-  config: ColorfulConfig,
-  colorSpace: ColorSpace
-): ColorResult[] {
-  const results: ColorResult[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const h = random() * 360;
-    
-    if (colorSpace === "oklch") {
-      const l = config.fixedLightness ?? (0.85 + random() * 0.1);
-      const c = config.fixedChroma ?? (0.05 + random() * 0.08);
-      const color = fromOklch(l, c, h);
-      if (color) results.push(color);
-    } else {
-      const s = config.fixedSaturation ?? (40 + random() * 30);
-      const lHsl = config.fixedLightnessHsl ?? (80 + random() * 15);
-      const color = fromHsl(h, s, lHsl);
-      if (color) results.push(color);
-    }
-  }
-
-  return results;
-}
-
-function generateRandomDark(
-  count: number,
-  random: () => number,
-  config: ColorfulConfig,
-  colorSpace: ColorSpace
-): ColorResult[] {
-  const results: ColorResult[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const h = random() * 360;
-    
-    if (colorSpace === "oklch") {
-      const l = config.fixedLightness ?? (0.2 + random() * 0.25);
-      const c = config.fixedChroma ?? (0.08 + random() * 0.12);
-      const color = fromOklch(l, c, h);
-      if (color) results.push(color);
-    } else {
-      const s = config.fixedSaturation ?? (50 + random() * 40);
-      const lHsl = config.fixedLightnessHsl ?? (15 + random() * 25);
-      const color = fromHsl(h, s, lHsl);
-      if (color) results.push(color);
-    }
-  }
-
-  return results;
-}
-
-function generateRandomWarm(
-  count: number,
-  random: () => number,
-  config: ColorfulConfig,
-  colorSpace: ColorSpace
-): ColorResult[] {
-  const results: ColorResult[] = [];
-
-  for (let i = 0; i < count; i++) {
-    let h: number;
-    if (random() > 0.3) {
-      h = random() * 80;
-    } else {
-      h = 300 + random() * 60;
-    }
+    let h = i * hueStep;
+    // Map to warm range: start at 300, wrap around at 360 to 0
+    h = h < 60 ? 300 + h : h - 60;
     h = normalizeHue(h);
     
     if (colorSpace === "oklch") {
-      const l = config.fixedLightness ?? (0.5 + random() * 0.3);
-      const c = config.fixedChroma ?? (0.12 + random() * 0.15);
+      const l = config.fixedLightness ?? 0.65;
+      const c = config.fixedChroma ?? 0.18;
       const color = fromOklch(l, c, h);
       if (color) results.push(color);
     } else {
-      const s = config.fixedSaturation ?? (60 + random() * 35);
-      const lHsl = config.fixedLightnessHsl ?? (45 + random() * 35);
-      const color = fromHsl(h, s, lHsl);
+      const s = config.fixedSaturation ?? 75;
+      const lVal = config.fixedLightnessHsl ?? 55;
+      const color = fromHsl(h, s, lVal);
       if (color) results.push(color);
     }
   }
 
-  return results;
+  return sortByHue(results);
 }
 
-function generateRandomCool(
+/**
+ * Generate cool spectrum (greens, cyans, blues)
+ * Hue range: 120-300 (cool colors)
+ */
+function generateCoolSpectrum(
   count: number,
-  random: () => number,
   config: ColorfulConfig,
   colorSpace: ColorSpace
 ): ColorResult[] {
   const results: ColorResult[] = [];
+  const startHue = 120;
+  const endHue = 280;
+  const hueStep = (endHue - startHue) / (count - 1 || 1);
 
   for (let i = 0; i < count; i++) {
-    const h = 120 + random() * 180;
+    const h = normalizeHue(startHue + i * hueStep);
     
     if (colorSpace === "oklch") {
-      const l = config.fixedLightness ?? (0.45 + random() * 0.35);
-      const c = config.fixedChroma ?? (0.1 + random() * 0.15);
+      const l = config.fixedLightness ?? 0.60;
+      const c = config.fixedChroma ?? 0.15;
       const color = fromOklch(l, c, h);
       if (color) results.push(color);
     } else {
-      const s = config.fixedSaturation ?? (55 + random() * 40);
-      const lHsl = config.fixedLightnessHsl ?? (40 + random() * 40);
-      const color = fromHsl(h, s, lHsl);
+      const s = config.fixedSaturation ?? 65;
+      const lVal = config.fixedLightnessHsl ?? 50;
+      const color = fromHsl(h, s, lVal);
       if (color) results.push(color);
     }
   }
@@ -271,26 +260,32 @@ function generateRandomCool(
   return results;
 }
 
-function generateEarthTones(
+/**
+ * Generate earth tones spectrum (browns, tans, olives)
+ * Hue range: 20-90 with low saturation
+ */
+function generateEarthSpectrum(
   count: number,
-  random: () => number,
   config: ColorfulConfig,
   colorSpace: ColorSpace
 ): ColorResult[] {
   const results: ColorResult[] = [];
+  const startHue = 20;
+  const endHue = 90;
+  const hueStep = (endHue - startHue) / (count - 1 || 1);
 
   for (let i = 0; i < count; i++) {
-    const h = 20 + random() * 70;
+    const h = normalizeHue(startHue + i * hueStep);
     
     if (colorSpace === "oklch") {
-      const l = config.fixedLightness ?? (0.35 + random() * 0.35);
-      const c = config.fixedChroma ?? (0.04 + random() * 0.08);
+      const l = config.fixedLightness ?? 0.50;
+      const c = config.fixedChroma ?? 0.08;
       const color = fromOklch(l, c, h);
       if (color) results.push(color);
     } else {
-      const s = config.fixedSaturation ?? (25 + random() * 35);
-      const lHsl = config.fixedLightnessHsl ?? (30 + random() * 40);
-      const color = fromHsl(h, s, lHsl);
+      const s = config.fixedSaturation ?? 35;
+      const lVal = config.fixedLightnessHsl ?? 40;
+      const color = fromHsl(h, s, lVal);
       if (color) results.push(color);
     }
   }
@@ -298,7 +293,10 @@ function generateEarthTones(
   return results;
 }
 
-function generateNeon(
+/**
+ * Generate truly random colors
+ */
+function generateRandom(
   count: number,
   random: () => number,
   config: ColorfulConfig,
@@ -310,14 +308,14 @@ function generateNeon(
     const h = random() * 360;
     
     if (colorSpace === "oklch") {
-      const l = config.fixedLightness ?? (0.75 + random() * 0.15);
-      const c = config.fixedChroma ?? (0.25 + random() * 0.1);
+      const l = config.fixedLightness ?? (0.4 + random() * 0.4);
+      const c = config.fixedChroma ?? (0.1 + random() * 0.18);
       const color = fromOklch(l, c, h);
       if (color) results.push(color);
     } else {
-      const s = config.fixedSaturation ?? (95 + random() * 5);
-      const lHsl = config.fixedLightnessHsl ?? (55 + random() * 15);
-      const color = fromHsl(h, s, lHsl);
+      const s = config.fixedSaturation ?? (50 + random() * 45);
+      const lVal = config.fixedLightnessHsl ?? (35 + random() * 40);
+      const color = fromHsl(h, s, lVal);
       if (color) results.push(color);
     }
   }
@@ -330,15 +328,15 @@ function generateNeon(
  */
 export function getColorfulMethodName(method: ColorfulMethod): string {
   const names: Record<ColorfulMethod, string> = {
-    "hue-sweep": "Hue Sweep",
-    "golden-angle": "Golden Angle",
-    "random-vibrant": "Vibrant",
-    "random-pastel": "Pastel",
-    "random-dark": "Dark",
-    "random-warm": "Warm",
-    "random-cool": "Cool",
-    "earth-tones": "Earth Tones",
+    spectrum: "Spectrum",
+    vibrant: "Vibrant",
+    pastel: "Pastel",
+    dark: "Dark",
     neon: "Neon",
+    warm: "Warm",
+    cool: "Cool",
+    earth: "Earth",
+    random: "Random",
   };
   return names[method];
 }
@@ -348,14 +346,14 @@ export function getColorfulMethodName(method: ColorfulMethod): string {
  */
 export function getAllColorfulMethods(): ColorfulMethod[] {
   return [
-    "hue-sweep",
-    "golden-angle",
-    "random-vibrant",
-    "random-pastel",
-    "random-dark",
-    "random-warm",
-    "random-cool",
-    "earth-tones",
+    "spectrum",
+    "vibrant",
+    "pastel",
+    "dark",
     "neon",
+    "warm",
+    "cool",
+    "earth",
+    "random",
   ];
 }
