@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useCallback } from "react";
 import { parseColor, type ColorResult, type ColorSpace } from "@/lib/color-utils";
 import { ColorInput } from "@/components/color-input";
@@ -33,16 +34,16 @@ export default function Home() {
     <main className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="max-w-6xl mx-auto px-4 py-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">
-                The Palette
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Perceptual color generator with OKLCH support
-              </p>
-            </div>
+            <Image
+              src="/logo.svg"
+              alt="The Palette"
+              width={171}
+              height={28}
+              priority
+              className="dark:invert"
+            />
             <SettingsPanel
               format={format}
               onFormatChange={setFormat}

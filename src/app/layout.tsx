@@ -30,6 +30,10 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -40,7 +44,7 @@ export const metadata: Metadata = {
       "Professional color palette generator using perceptually uniform OKLCH color space. Create harmonious palettes, tonal scales, gradients, and extract colors from images.",
     images: [
       {
-        url: "/og-image.png",
+        url: "/ogp.png",
         width: 1200,
         height: 630,
         alt: "The Palette - Perceptual Color Generator",
@@ -52,7 +56,7 @@ export const metadata: Metadata = {
     title: "The Palette - Perceptual Color Generator",
     description:
       "Professional color palette generator using perceptually uniform OKLCH color space.",
-    images: ["/og-image.png"],
+    images: ["/ogp.png"],
   },
   alternates: {
     canonical: "https://the-palette.vercel.app",
